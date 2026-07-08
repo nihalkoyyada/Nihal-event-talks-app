@@ -45,7 +45,8 @@ const elements = {
     charCountText: document.getElementById("char-count-text"),
     btnCloseModal: document.getElementById("btn-close-modal"),
     btnCancelTweet: document.getElementById("btn-cancel-tweet"),
-    btnSubmitTweet: document.getElementById("btn-submit-tweet")
+    btnSubmitTweet: document.getElementById("btn-submit-tweet"),
+    btnExportCsv: document.getElementById("btn-export-csv")
 };
 
 // -----------------------------------------
@@ -102,6 +103,9 @@ function setupEventListeners() {
             hideTweetModal();
         }
     });
+
+    // Export to CSV
+    elements.btnExportCsv.addEventListener("click", exportToCSV);
 }
 
 // -----------------------------------------
@@ -248,6 +252,7 @@ function updateStats() {
 function renderTimeline() {
     elements.timelineFeed.innerHTML = "";
     let visibleEntriesCount = 0;
+    appState.filteredEntries = [];
 
     appState.entries.forEach((entry, entryIndex) => {
         // Filter the updates in this entry
@@ -275,6 +280,13 @@ function renderTimeline() {
         // Only render the entry group if it has matching updates
         if (filteredUpdates.length > 0) {
             visibleEntriesCount++;
+            
+            // Save matching entries for export
+            appState.filteredEntries.push({
+                date: entry.date,
+                link: entry.link,
+                updates: filteredUpdates
+            });
             
             const timelineGroup = document.createElement("div");
             timelineGroup.className = "timeline-group";
@@ -350,6 +362,21 @@ function renderTimeline() {
                 const cardFooter = document.createElement("div");
                 cardFooter.className = "release-card-footer";
                 
+                // Copy Button
+                const copyBtn = document.createElement("button");
+                copyBtn.className = "btn btn-secondary btn-sm";
+                copyBtn.style.marginRight = "0.75rem";
+                copyBtn.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="icon">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    <span>Copy</span>
+                `;
+                copyBtn.addEventListener("click", () => {
+                    copyToClipboard(update.content_text, copyBtn);
+                });
+                
                 const tweetBtn = document.createElement("button");
                 tweetBtn.className = "btn btn-secondary btn-sm";
                 tweetBtn.innerHTML = `
@@ -364,6 +391,7 @@ function renderTimeline() {
                     openTweetComposer(entry.date, update.type, update.content_text, entry.link);
                 });
 
+                cardFooter.appendChild(copyBtn);
                 cardFooter.appendChild(tweetBtn);
                 card.appendChild(cardFooter);
 
@@ -466,4 +494,57 @@ function updateCharacterCount() {
         window.open(twitterUrl, "_blank");
         hideTweetModal();
     };
+}
+
+// -----------------------------------------
+// Utilities: Copy & Export
+// -----------------------------------------
+function copyToClipboard(text, buttonElement) {
+    navigator.clipboard.writeText(text).then(() => {
+        const span = buttonElement.querySelector("span");
+        const originalText = span.textContent;
+        span.textContent = "Copied!";
+        buttonElement.classList.add("btn-success");
+        setTimeout(() => {
+            span.textContent = originalText;
+            buttonElement.classList.remove("btn-success");
+        }, 2000);
+    }).catch(err => {
+        console.error("Failed to copy text: ", err);
+    });
+}
+
+function exportToCSV() {
+    if (!appState.filteredEntries || appState.filteredEntries.length === 0) {
+        alert("No release notes found to export.");
+        return;
+    }
+    
+    // CSV Header
+    let csvContent = "Date,Type,Description,Link\n";
+    
+    appState.filteredEntries.forEach(entry => {
+        const dateEscaped = `"${entry.date.replace(/"/g, '""')}"`;
+        const linkEscaped = `"${entry.link.replace(/"/g, '""')}"`;
+        
+        entry.updates.forEach(update => {
+            const typeEscaped = `"${update.type.replace(/"/g, '""')}"`;
+            // Keep CSV columns clean by trimming and replacing newlines with spaces
+            const cleanText = update.content_text.replace(/\r?\n|\r/g, " ").replace(/\s+/g, " ").trim();
+            const descEscaped = `"${cleanText.replace(/"/g, '""')}"`;
+            
+            csvContent += `${dateEscaped},${typeEscaped},${descEscaped},${linkEscaped}\n`;
+        });
+    });
+    
+    // Create Blob download link
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `bigquery_release_notes_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }

@@ -290,6 +290,12 @@ body {
     border-color: var(--text-muted);
 }
 
+.btn-success {
+    background-color: var(--color-feature) !important;
+    color: white !important;
+    border-color: var(--color-feature) !important;
+}
+
 .btn-twitter {
     background-color: #000000;
     color: #ffffff;
