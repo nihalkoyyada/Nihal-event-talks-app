@@ -588,6 +588,13 @@ body {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    
+    /* Sticky Header UX */
+    position: sticky;
+    top: 0;
+    background-color: var(--bg-app);
+    padding: 0.5rem 0;
+    z-index: 10;
 }
 
 .timeline-date span.entry-link {
